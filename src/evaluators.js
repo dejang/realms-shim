@@ -15,7 +15,11 @@ import {
 } from './commons';
 import { getOptimizableGlobals } from './optimizer';
 import { createScopeHandler } from './scopeHandler';
-import { rejectDangerousSourcesTransform } from './sourceParser';
+import {
+  rejectImportExpressionsTransform,
+  rejectHtmlCommentsTransform,
+  rejectSomeDirectEvalExpressionsTransform
+} from './sourceParser';
 import { assert, throwTantrum } from './utilities';
 
 function buildOptimizer(constants) {
@@ -72,7 +76,10 @@ export function createSafeEvaluatorFactory(
   unsafeRec,
   safeGlobal,
   transforms,
-  sloppyGlobals
+  sloppyGlobals,
+  rejectHtmlComments,
+  rejectImportExpressions,
+  rejectSomeDirectEvalExpressions
 ) {
   const { unsafeFunction } = unsafeRec;
 
@@ -83,16 +90,25 @@ export function createSafeEvaluatorFactory(
     constants
   );
 
+  const mandatoryTransforms = [];
+
+  if (rejectHtmlComments !== false)
+    mandatoryTransforms.push(rejectHtmlCommentsTransform);
+
+  if (rejectImportExpressions !== false)
+    mandatoryTransforms.push(rejectImportExpressionsTransform);
+
+  if (rejectSomeDirectEvalExpressions !== false)
+    mandatoryTransforms.push(rejectSomeDirectEvalExpressionsTransform);
+
   function factory(endowments = {}, options = {}) {
     const localTransforms = options.transforms || [];
     const realmTransforms = transforms || [];
 
-    const defaultTransforms =
-      realmTransforms.length > 0 ? [] : [rejectDangerousSourcesTransform];
     const allTransforms = [
       ...localTransforms,
       ...realmTransforms,
-      ...defaultTransforms
+      ...mandatoryTransforms
     ];
 
     // We use the the concise method syntax to create an eval without a
